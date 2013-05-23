@@ -14,10 +14,31 @@ consists of:
 Tested on Ubuntu 11.10 (Oneiric Ocelot) and Debian 7.0 (wheezy).
 
 
+Why?
+----
+
+I've found this to be the quickest way to fire up some virtual
+machines for testing purposes in their own self-contained VLAN,
+especially when using meaningful shell aliases to run the scripts. No
+more faffing about with graphical interfaces!
+
+I'm aware there may be better tools out there that do the same thing,
+but I was interested in the learning process.
+
+
 Prerequisites
 -------------
 
-You will need the following (Debian / Ubuntu) packages:
+You will need at least the following:
+
+1) A QEMU vitual machine disk image.
+
+How to create one of these is beyond the scope of this document, but
+you can find the documentation for QEMU here:
+
+http://en.wikibooks.org/wiki/QEMU
+
+Some Debian/Ubuntu packages:
 
 * Ubuntu 11.10 (Oneiric Ocelot)
 
@@ -76,3 +97,11 @@ There are two main scripts:
 So to launch a VM in a new or existing network container:
 
  $ vdcnet start; launchvm <disk_image_filename> <RAM_in_MB>
+
+
+More Information
+----------------
+
+For more info, see the Wiki :)
+
+Simon.
