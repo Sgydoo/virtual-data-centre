@@ -2,14 +2,13 @@
 #
 # launchvm
 #
-# Launches a VM and plugs it in to an existing VDE switch. Note: This is
-# work in progress.
+# Launches a VM and plugs it in to an existing VDE switch.
 #
-# The script takes a VDE switch name, an image name, a RAM amount and an
-# extra parameter which, due to the wrong kind of laziness, can mean a
-# few things :)
+# The script takes a VDE switch name, an image name, a RAM amount and
+# an extra 'nographic' parameter which launches the VM without the
+# console.
 #
-# Usage: launchvm <image_name> <mem> [nographic | local]
+# Usage: launchvm <image_name> <mem> [nographic]
 #
 # Eg.  launchvm centos-5.7-trumpton.img 256
 #
