@@ -3,7 +3,8 @@ Virtual Data Centre
 ===================
 
 These scripts allow you to launch a virtual network container for
-QEMU/kvm virtual machines. The container consists of:
+QEMU/kvm virtual machines on a Linux host system. The container
+consists of:
 
 * A tap interface on the host machine.
 * A Virtual Distributed Ethernet (VDE) switch connected to the tap interface.
@@ -75,4 +76,3 @@ There are two main scripts:
 So to launch a VM in a new or existing network container:
 
  $ vdcnet start; launchvm <disk_image_filename> <RAM_in_MB>
-
