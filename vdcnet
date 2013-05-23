@@ -1,0 +1,248 @@
+#!/bin/sh
+#
+# vdcnet
+#
+# Brings up and down a virtual data centre network. Also reports
+# on status.
+#
+# Usage: vdcnet up|down|status
+#
+#
+# Author: Simon Young, 08.12.2011
+#
+#
+# Modification History
+# --------------------
+#
+# 10.05.2013  SY  Now uses unixcmd instead of vdecmd, since the latter
+#                 is not included with Debian Wheezy's vde2 package.
+#
+#-----------------------------------------------------------------------
+
+#-----------------------------------------------------------------------
+# These can be changed appropriately to reflect which DC is coming up
+#-----------------------------------------------------------------------
+iface_name='tap0'
+router_ip='192.168.10.1'
+network='192.168.10.0'
+router_name='dc1'
+user=$(whoami)
+
+#-----------------------------------------------------------------------
+# Work out which external interface to use in our NAT rules
+#-----------------------------------------------------------------------
+ext_iface=''
+/sbin/ip addr show wlan0 | /bin/grep inet >/dev/null && ext_iface='wlan0'
+/sbin/ip addr show eth0  | /bin/grep inet >/dev/null && ext_iface='eth0'
+
+/bin/echo "INFO: Using external Interface: $ext_iface"
+
+usage() {
+  /bin/echo Usage: vdcnet [start|up|stop|down|status]
+  exit 0
+}
+
+status() {
+  retcode=0
+  #---------------------------------------------------------------------
+  # Switch Status
+  #---------------------------------------------------------------------
+  if [ -S /tmp/${router_name}-mgt ]; then
+    /bin/echo
+    /bin/echo '------------------------------------------------------------------------'
+    /bin/echo "* Found VDE switch management socket /tmp/${router_name}-mgt"
+    /bin/echo
+    /bin/echo "Active ports:"
+    /bin/echo
+    /usr/bin/unixcmd -s /tmp/${router_name}-mgt -f /etc/vde2/vdecmd 'port/print'
+    /bin/echo
+  else
+    retcode=1
+    /bin/echo
+    /bin/echo '------------------------------------------------------------------------'
+    /bin/echo "* No VDE switch socket found"
+    /bin/echo
+  fi
+  
+  #---------------------------------------------------------------------
+  # Check network services
+  #---------------------------------------------------------------------
+  /bin/echo '------------------------------------------------------------------------'
+  /bin/echo '* Network services:'
+  /bin/echo
+  /bin/ps aux | /bin/grep [d]nsmasq >/dev/null && echo "DNS/DHCP: dnsmasq is running" || retcode=1
+  
+  #---------------------------------------------------------------------
+  # Find the TAP interface
+  #---------------------------------------------------------------------
+  /bin/echo
+  /bin/echo '------------------------------------------------------------------------'
+  /bin/echo '* Interfaces:'
+  /bin/echo
+  /usr/bin/sudo /sbin/ip link show $iface_name || retcode=1
+  
+  #---------------------------------------------------------------------
+  # Show the iptables rules
+  #---------------------------------------------------------------------
+  /bin/echo
+  /bin/echo '------------------------------------------------------------------------'
+  /bin/echo "* iptables rules:"
+  /bin/echo
+  /usr/bin/sudo /sbin/iptables -L
+  /bin/echo
+  return $retcode
+}
+
+is_up() {
+  status >/dev/null 2>&1
+}
+
+start() {
+  is_up
+  if [ "$?" -eq "0" ]; then
+    /bin/echo "INFO: Network is already configured"
+    exit 1
+  fi
+  # We could do something snazzy here, but a warning will suffice for now
+  /sbin/ifconfig $iface_name >/dev/null 2>&1 && echo "Warning: Interface $iface_name is already configured."
+  
+  #---------------------------------------------------------------------
+  # Bring up a TAP interface, then create a switch and plug it in!
+  #---------------------------------------------------------------------
+  /bin/echo "Configuring TAP interface"
+  /bin/echo
+  /usr/bin/sudo /usr/sbin/tunctl -u $user -t $iface_name && \
+  /usr/bin/sudo /sbin/ifconfig $iface_name $router_ip netmask 255.255.255.0 && \
+  /sbin/ip link show tap0
+  
+  /bin/echo
+  /bin/echo "Starting VDE Switch"
+  /bin/echo
+  /usr/bin/vde_switch -d -s /tmp/vde_${router_name}.ctl -t $iface_name -M /tmp/${router_name}-mgt && \
+  /usr/bin/unixcmd -s /tmp/${router_name}-mgt -f /etc/vde2/vdecmd 'port/print'
+  
+  #---------------------------------------------------------------------
+  #
+  # Provide network services (DHCP, DNS forwarding, NAT) with slirpvde.
+  #
+  # Correction... slirpvde *does* work, but it's quite difficult to
+  # communicate with the VMs because they live on the other side of the
+  # router.
+  #
+  # The easiest option, then, is to configure a TAP interface on your
+  # host machine and plug it straight into the VDE switch - that way you
+  # get to talk to the VMs unhindered. If you also set the host's TAP
+  # interface as the guests' default gateway, you get to control what
+  # they can access in the outside world using iptables rules.
+  # Ultimate control! :)
+  #
+  # Unfortunately, you then also need to run a DNS forwarder like
+  # dnsmasq in order to provide DNS services (dnsmasq also does DHCP
+  # if you need it). Not too much hassle, but a bit of extra work...
+  #
+  #---------------------------------------------------------------------
+  #
+  # echo "Starting SLIRP"
+  # /usr/bin/slirpvde -d -s /tmp/vde_${router_name}.ctl --dhcp --network $network
+  
+  
+  #---------------------------------------------------------------------
+  # Restart any services that the network may rely on (DNS, DHCP etc)
+  #---------------------------------------------------------------------
+  
+  #---------------------------------------------------------------------
+  #
+  # Note that dnsmasq needs to be configured separately.
+  #
+  # My /etc/dnsmasq.d/local.conf looks like this:
+  #
+  # except-interface=eth0
+  # bind-interfaces
+  # dhcp-range=192.168.10.50,192.168.10.100,12h
+  #
+  #---------------------------------------------------------------------
+  /bin/echo
+  /usr/bin/sudo /etc/init.d/dnsmasq restart
+  /bin/echo
+  
+  #---------------------------------------------------------------------
+  # Configure IP forwarding and NAT (assumes the host's TAP interface
+  # is acting as default route for the guests.
+  #---------------------------------------------------------------------
+  /bin/echo "Configuring NAT"
+  /bin/echo
+  /usr/bin/sudo /sbin/sysctl -w net.ipv4.ip_forward=1
+  /usr/bin/sudo /sbin/iptables -t nat -A POSTROUTING -o $ext_iface -j MASQUERADE
+  /usr/bin/sudo /sbin/iptables -A FORWARD -i $ext_iface -o $iface_name -m state --state RELATED,ESTABLISHED -j ACCEPT
+  /usr/bin/sudo /sbin/iptables -A FORWARD -i $iface_name -o $ext_iface -j ACCEPT
+  /usr/bin/sudo /sbin/iptables -L
+  
+  #---------------------------------------------------------------------
+  # Finish off with some useful information for the user
+  #---------------------------------------------------------------------
+  /bin/echo
+  /bin/echo '#####################################################'
+  /bin/echo '#                                                   #'
+  /bin/echo '#  Congratulations!                                 #'
+  /bin/echo '#  Your network container is now ready.             #'
+  /bin/echo '#                                                   #'
+  /bin/echo '#  You can access the switch using vdeterm:         #'
+  /bin/echo "#  $ vdeterm /tmp/${router_name}-mgt                           #"
+  /bin/echo '#                                                   #'
+  /bin/echo "# Your host's $iface_name interface will be the guests'    #"
+  /bin/echo '# default gateway. dnsmasq provides DNS forwarding  #'
+  /bin/echo '# and DHCP (if required). Have the fun!             #'
+  /bin/echo '#                                                   #'
+  /bin/echo '#####################################################'
+  /bin/echo
+}
+  
+  
+stop() {
+  is_up
+  if [ "$?" -eq "1" ]; then
+    /bin/echo "Network is not configured"
+    exit 1
+  fi
+  #---------------------------------------------------------------------
+  # Stop the software switch
+  #---------------------------------------------------------------------
+  /bin/echo
+  /bin/echo "Shutting down VDE switch"
+  /usr/bin/unixcmd -s /tmp/${router_name}-mgt -f /etc/vde2/vdecmd shutdown
+  
+  #---------------------------------------------------------------------
+  # Stop network services
+  #---------------------------------------------------------------------
+  /bin/echo
+  /bin/echo "Stopping dnsmasq"
+  /usr/bin/sudo /etc/init.d/dnsmasq stop
+  
+  #---------------------------------------------------------------------
+  # Destroy the TAP interface
+  #---------------------------------------------------------------------
+  /bin/echo
+  /bin/echo "Bringing down $iface_name"
+  /usr/bin/sudo /sbin/ip link delete $iface_name
+  
+  #---------------------------------------------------------------------
+  # Flush the iptables rules
+  #---------------------------------------------------------------------
+  /bin/echo
+  /bin/echo "Flushing iptables rules"
+  /usr/bin/sudo /sbin/sysctl -w net.ipv4.ip_forward=0
+  /usr/bin/sudo /sbin/iptables -F
+  /usr/bin/sudo /sbin/iptables -L
+  
+  /bin/echo
+  /bin/echo "Done."
+}
+  
+
+case $1 in
+  start|up)  start  ;;
+  stop|down) stop   ;;
+  status)    status ;;
+  *)         usage  ;;
+esac
+

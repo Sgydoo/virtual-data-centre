@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# launchvm
+#
+# Launches a VM and plugs it in to an existing VDE switch. Note: This is
+# work in progress.
+#
+# The script takes a VDE switch name, an image name, a RAM amount and an
+# extra parameter which, due to the wrong kind of laziness, can mean a
+# few things :)
+#
+# Usage: launchvm <image_name> <mem> [nographic | local]
+#
+# Eg.  launchvm centos-5.7-trumpton.img 256
+#
+#
+# Author: Simon Young, 02.12.2011
+#
+#
+# Modification History
+# --------------------
+#
+# 16.05.2013  SY  Now checking whether the image is already running.
+#                 Running two machines based on the same disk image can
+#                 result in filesystem corruption and network problems.
+#
+#-----------------------------------------------------------------------
+switch='dc1'
+img=$1
+mem=$2
+extra=$3
+image_dir='/home/simon/VirtualDisks/qemu'
+
+#-----------------------------------------------------------------------
+# Check whether we're running this image already
+#-----------------------------------------------------------------------
+running=0
+/bin/ps aux | /bin/grep -v "$$\|grep" | /bin/grep $img > /dev/null && running=1
+
+if [ "$running" -eq 1 ]; then
+  /bin/echo "$img is already running"
+  exit 1
+fi
+
+#-----------------------------------------------------------------------
+# Look at the extra argument and act accordingly. One day I'll convert
+# this to use getopts. BUT IT IS NOT THIS DAY!
+#-----------------------------------------------------------------------
+if [ "$extra" = "nographic" ]; then
+  nographic='-nographic'
+else
+  nographic=''
+fi
+
+if [ ! -d $image_dir ]; then
+  /bin/echo "Can't find disk image. Disk not mounted?"
+  exit 1
+fi
+
+#-----------------------------------------------------------------------
+# Is this 64-bit? Assume so, if the image file name has a '64' in it.
+#-----------------------------------------------------------------------
+qemu='/usr/bin/qemu-system-i386'
+/bin/echo $img | /bin/grep 64 && qemu='/usr/bin/qemu-system-x86_64' 
+
+/bin/echo "INFO: Using QEMU system $qemu"
+
+echo "Bringing up $img. Please wait..."
+/usr/bin/vdeq $qemu -drive file=$image_dir/$img,cache=writethrough -m $mem $nographic \
+  -machine accel=kvm \
+  -net nic,macaddr=$(/usr/local/bin/macgen) -net vde,sock=/tmp/vde_${switch}.ctl 2>/dev/null & \
+sleep 1
+
+# TODO: Find a way to verify this.
+/bin/echo "Done. Please wait while your VM is booted."
