@@ -37,7 +37,7 @@ switch='dc1'
 img=$1
 mem=$2
 extra=$3
-image_dir='~/VirtualDisks/qemu'
+image_dir="$HOME/VirtualDisks/qemu"
 
 #-----------------------------------------------------------------------
 # Check whether we're running this image already
