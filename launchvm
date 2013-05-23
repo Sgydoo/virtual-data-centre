@@ -8,6 +8,8 @@
 # an extra 'nographic' parameter which launches the VM without the
 # console.
 #
+# It expects disk images to live in ~/VirtualDisks/qemu
+#
 # Usage: launchvm <image_name> <mem> [nographic]
 #
 # Eg.  launchvm centos-5.7-trumpton.img 256
@@ -23,12 +25,19 @@
 #                 Running two machines based on the same disk image can
 #                 result in filesystem corruption and network problems.
 #
+#
+# TO-DO
+# -----
+#
+# * Convert arguments to 'getopts' format.
+# * Find a way to verify that the VM has booted successfully.
+#
 #-----------------------------------------------------------------------
 switch='dc1'
 img=$1
 mem=$2
 extra=$3
-image_dir='/home/simon/VirtualDisks/qemu'
+image_dir='~/VirtualDisks/qemu'
 
 #-----------------------------------------------------------------------
 # Check whether we're running this image already
@@ -64,7 +73,7 @@ qemu='/usr/bin/qemu-system-i386'
 
 /bin/echo "INFO: Using QEMU system $qemu"
 
-echo "Bringing up $img. Please wait..."
+/bin/echo "Bringing up $img. Please wait..."
 /usr/bin/vdeq $qemu -drive file=$image_dir/$img,cache=writethrough -m $mem $nographic \
   -machine accel=kvm \
   -net nic,macaddr=$(/usr/local/bin/macgen) -net vde,sock=/tmp/vde_${switch}.ctl 2>/dev/null & \
