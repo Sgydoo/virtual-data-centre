@@ -6,7 +6,7 @@ These scripts allow you to launch a virtual network container for
 QEMU/kvm virtual machines on a Linux host system. The container
 consists of:
 
-* A tap interface on the host machine.
+* A TUN/TAP interface on the host machine.
 * A Virtual Distributed Ethernet (VDE) switch connected to the tap interface.
 * iptables rules on the host to configure NAT to the outside world.
 * A DHCP server and DNS forwarder. We use dnsmasq for this.
