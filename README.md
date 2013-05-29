@@ -40,22 +40,22 @@ you can find the documentation for QEMU [here](http://en.wikibooks.org/wiki/QEMU
 
 * Ubuntu 11.10 (Oneiric Ocelot)
 
-    iptables
-    qemu-common
-    qemu-kvm
-    kvm-pxe (optional, but stops a warning message every time you start a VM)
-    uml-utilities
-    vde2
-    dnsmasq
+		iptables
+		qemu-common
+		qemu-kvm
+		kvm-pxe (optional, but stops a warning message every time you start a VM)
+		uml-utilities
+		vde2
+		dnsmasq
 
 * Debian 7.0 (wheezy)
 
-    iptables
-    qemu
-    qemu-kvm
-    uml-utilities
-    vde2
-    dnsmasq
+		iptables
+		qemu
+		qemu-kvm
+		uml-utilities
+		vde2
+		dnsmasq
 
 General Note: The uml-utilities package also installs a uml switch,
 which starts up automatically at boot time. Since we won't be using
@@ -68,9 +68,9 @@ Configuring dnsmasq
 After installation, dnsmasq needs to be configured. For example, my
 /etc/dnsmasq.d/local.conf looks like this:
 
-    except-interface=eth0
-    bind-interfaces
-    dhcp-range=192.168.10.50,192.168.10.100,12h
+	except-interface=eth0
+	bind-interfaces
+	dhcp-range=192.168.10.50,192.168.10.100,12h
 
 To prevent contention with existing DHCP servers, the 'except-
 interface' directive should be whichever interface is connected
@@ -94,7 +94,7 @@ There are two main scripts:
 
 So to launch a VM in a new or existing network container:
 
-    $ vdcnet start; launchvm <disk_image_filename> <RAM_in_MB>
+	$ vdcnet start; launchvm <disk_image_filename> <RAM_in_MB>
 
 
 More Information
